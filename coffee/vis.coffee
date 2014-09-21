@@ -13,7 +13,7 @@ Bubbles = () ->
   margin = {top: 5, right: 0, bottom: 0, left: 0}
   # largest size for our bubbles
   maxRadius = 65
-  currentYear = '1940'
+  currentYear = '1880'
 
   # this scale will be used to size our bubbles
   rScale = d3.scale.sqrt().range([0,maxRadius])
@@ -351,15 +351,14 @@ Bubbles = () ->
   updateActive = (id) ->
     node.classed("bubble-selected", (d) -> id == idValue(d))
     # if no node is selected, id will be empty
-    if id.length > 0
-      d3.select("#status").html("<h3>The word <span class=\"active\">#{id}</span> is now active</h3>")
-    else
-      d3.select("#status").html("<h3>No word is active</h3>")
+    # if id.length > 0
+      # d3.select("#status").html("<h3>The word <span class=\"active\">#{id}</span> is now active</h3>")
+    # else
+      # d3.select("#status").html("<h3>No word is active</h3>")
 
   # ---
   # ---
   getYearData = (year) ->
-    console.log(allData)
     data = allData.filter((y) -> y.key == year)[0].values
     console.log(data)
     data
@@ -426,6 +425,78 @@ Bubbles = () ->
   # return the chart function we have created
   return chart
 
+
+Slider = () ->
+  margin = {top: 0, right: 50, bottom: 10, left: 50}
+  width = 960 - margin.left - margin.right
+  height = 75 - margin.top - margin.bottom
+  data = []
+  handle = null
+
+  xScale = d3.time.scale().range([0, width])
+    .clamp(true)
+
+  xAxis = d3.svg.axis()
+    .scale(xScale)
+    .orient("bottom")
+    .tickSize(0)
+    .tickPadding(12)
+
+  format = d3.time.format("%Y")
+
+  brushed = () ->
+    value = brush.extent()[0]
+    if d3.event.sourceEvent
+      value = xScale.invert(d3.mouse(this)[0])
+      brush.extent([value,value])
+    handle.attr("cx", xScale(value))
+
+  brush = d3.svg.brush()
+    .x(xScale)
+    .extent([0,0])
+    .on("brush", brushed)
+
+  transformData = (rawData) ->
+    data = []
+    rawData.forEach (d) ->
+      data.push({"year":d, "date":format.parse(d)})
+    data
+      
+  chart = (selection) ->
+    selection.each (inputData) ->
+      data = transformData(inputData)
+
+      xScale.domain([data[0].date, data[data.length - 1].date])
+
+      svg = d3.select(this).selectAll("svg").data([data])
+      svgEnter = svg.enter().append("svg")
+      svg.attr("width", width + margin.left + margin.right )
+      svg.attr("height", height + margin.top + margin.bottom )
+      
+      g = svgEnter.append("g")
+        .attr("transform", "translate(#{margin.left},#{margin.top})")
+
+      axis = g.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0,#{height / 2})")
+        .call(xAxis)
+
+      slider = g.append("g")
+        .attr("class", "slider")
+        .call(brush)
+
+      slider.selectAll(".extent,.resize").remove()
+
+      slider.select(".background")
+        .attr("height", height)
+
+      handle = slider.append("circle")
+        .attr("class", "handle")
+        .attr("transform", "translate(0," + height / 2 + ")")
+        .attr("r", 9)
+
+  return chart
+
 # ---
 # Helper function that simplifies the calling
 # of our chart with it's data and div selector
@@ -457,6 +528,7 @@ transformData = (rawData) ->
 $ ->
   # create a new Bubbles chart
   plot = Bubbles()
+  slider = Slider()
 
   # ---
   # function that is called when
@@ -464,8 +536,10 @@ $ ->
   # ---
   display = (error, rawData) ->
     data = transformData(rawData)
+    years = data.map((d) -> d.key)
 
     plotData("#vis", data, plot)
+    plotData("#slider", years, slider)
 
   # we are storing the current year in the search component
   # just to make things easy
