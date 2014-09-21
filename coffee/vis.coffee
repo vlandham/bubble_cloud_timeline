@@ -473,11 +473,9 @@ $ ->
   console.log(key)
   year = key
 
-  # default to the first year if something gets messed up
+  # default to the first year
   if !year
-    year = '1940'
-
-  console.log(year)
+    year = '1880'
 
   # bind change in drop down to change the
   # search url and reset the hash url
@@ -488,7 +486,7 @@ $ ->
   #     location.search = encodeURIComponent(key)
 
   # set the book title from the text name
-  d3.select("#dynamic_title").html(year)
+  d3.select("#dynamic-title").html(year)
 
   # load our data
   d3.tsv("data/top_baby_names.tsv", display)
