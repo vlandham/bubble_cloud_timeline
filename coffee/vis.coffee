@@ -6,12 +6,14 @@ Bubbles = () ->
   # the rest of the functions inside Bubbles
   width = 980
   height = 510
+  allData = []
   data = []
   node = null
   label = null
   margin = {top: 5, right: 0, bottom: 0, left: 0}
   # largest size for our bubbles
   maxRadius = 65
+  currentYear = '1940'
 
   # this scale will be used to size our bubbles
   rScale = d3.scale.sqrt().range([0,maxRadius])
@@ -19,7 +21,7 @@ Bubbles = () ->
   # I've abstracted the data value used to size each
   # into its own function. This should make it easy
   # to switch out the underlying dataset
-  rValue = (d) -> parseInt(d.count)
+  rValue = (d) -> d.n
 
   # function to define the 'id' of a data element
   #  - used to bind the data uniquely to the force nodes
@@ -32,6 +34,10 @@ Bubbles = () ->
   #  again, abstracted to ease migration to 
   #  a different dataset if desired
   textValue = (d) -> d.name
+
+  # function to define what attribute to 
+  # use for the node's class
+  classValue = (d) -> d.sex
 
   # constants to control how
   # collision look and act
@@ -53,11 +59,11 @@ Bubbles = () ->
   # - for your own dataset, you might want
   #  to tweak a bit more
   # ---
-  transformData = (rawData) ->
-    rawData.forEach (d) ->
-      d.count = parseInt(d.count)
-      rawData.sort(() -> 0.5 - Math.random())
-    rawData
+  # transformData = (rawData) ->
+  #   rawData.forEach (d) ->
+  #     d.count = parseInt(d.count)
+  #     rawData.sort(() -> 0.5 - Math.random())
+  #   rawData
 
   # ---
   # tick callback function will be executed for every
@@ -98,14 +104,18 @@ Bubbles = () ->
   #  for a explanation and rational behind this function design
   # ---
   chart = (selection) ->
-    selection.each (rawData) ->
+    selection.each (inputData) ->
 
       # first, get the data in the right format
-      data = transformData(rawData)
+      # data = transformData(inputData)
+      allData = inputData
       # setup the radius scale's domain now that
       # we have some data
-      maxDomainValue = d3.max(data, (d) -> rValue(d))
+      maxDomainValue = d3.max(allData, (n) -> d3.max(n.values, (d) -> rValue(d)))
       rScale.domain([0, maxDomainValue])
+      console.log(maxDomainValue)
+
+      data = getYearData(currentYear)
 
       # a fancy way to setup svg element
       svg = d3.select(this).selectAll("svg").data([data])
@@ -172,6 +182,7 @@ Bubbles = () ->
     # idValue returns
     node = node.selectAll(".bubble-node").data(data, (d) -> idValue(d))
 
+
     # we don't actually remove any nodes from our data in this example 
     # but if we did, this line of code would remove them from the
     # visualization as well
@@ -181,13 +192,17 @@ Bubbles = () ->
     # the styling comes from the css
     node.enter()
       .append("a")
-      .attr("class", "bubble-node")
+      .attr("class", (d) -> "bubble-node #{classValue(d)}")
       .attr("xlink:href", (d) -> "##{encodeURIComponent(idValue(d))}")
       .call(force.drag)
       .call(connectEvents)
       .append("circle")
-      .attr("r", (d) -> rScale(rValue(d)))
+      .attr("r", 0)
+      # .attr("r", (d) -> rScale(rValue(d)))
 
+    node.select("circle").transition()
+      .duration(500)
+      .attr("r", (d) -> rScale(rValue(d)))
   # ---
   # updateLabels is more involved as we need to deal with getting the sizing
   # to work well with the font size
@@ -342,6 +357,14 @@ Bubbles = () ->
       d3.select("#status").html("<h3>No word is active</h3>")
 
   # ---
+  # ---
+  getYearData = (year) ->
+    console.log(allData)
+    data = allData.filter((y) -> y.key == year)[0].values
+    console.log(data)
+    data
+
+  # ---
   # hover event
   # ---
   mouseover = (d) ->
@@ -352,6 +375,15 @@ Bubbles = () ->
   # ---
   mouseout = (d) ->
     node.classed("bubble-hover", false)
+
+  # ---
+  # public getter/setter for currentYear variable
+  # ---
+  chart.year = (_) ->
+    if !arguments.length
+      return currentYear
+    currentYear = _
+    chart
 
   # ---
   # public getter/setter for jitter variable
@@ -405,6 +437,20 @@ root.plotData = (selector, data, plot) ->
     .call(plot)
 
 
+transformData = (rawData) ->
+  nest = d3.nest()
+    .key((d) -> d.year)
+    .rollup (n) ->
+      # rollup gives us access to each sub array
+      # so let's clean up the data a bit
+      n.forEach (d,i) ->
+        d.n = +d.n
+        d.prop = +d.prop
+        d.index = i
+      n
+    .entries(rawData)
+  nest
+
 # ---
 # jQuery document ready.
 # ---
@@ -416,8 +462,9 @@ $ ->
   # function that is called when
   # data is loaded
   # ---
-  display = (error, data) ->
-    console.log(data)
+  display = (error, rawData) ->
+    data = transformData(rawData)
+
     plotData("#vis", data, plot)
 
   # we are storing the current year in the search component
@@ -430,13 +477,15 @@ $ ->
   if !year
     year = '1940'
 
+  console.log(year)
+
   # bind change in drop down to change the
   # search url and reset the hash url
-  d3.select("#text-select")
-    .on "change", (e) ->
-      key = $(this).val()
-      location.replace("#")
-      location.search = encodeURIComponent(key)
+  # d3.select("#text-select")
+  #   .on "change", (e) ->
+  #     key = $(this).val()
+  #     location.replace("#")
+  #     location.search = encodeURIComponent(key)
 
   # set the book title from the text name
   d3.select("#dynamic_title").html(year)
