@@ -1,6 +1,8 @@
 
 root = exports ? this
 
+dispatch = d3.dispatch("yearchange")
+
 Bubbles = () ->
   # standard variables accessible to
   # the rest of the functions inside Bubbles
@@ -8,11 +10,13 @@ Bubbles = () ->
   height = 510
   allData = []
   data = []
+  nodes = null
   node = null
+  labels = null
   label = null
   margin = {top: 5, right: 0, bottom: 0, left: 0}
   # largest size for our bubbles
-  maxRadius = 65
+  maxRadius = 60
   currentYear = '1880'
 
   # this scale will be used to size our bubbles
@@ -49,21 +53,7 @@ Bubbles = () ->
   # acts
   # - jitter controls the 'jumpiness'
   #  of the collisions
-  jitter = 0.5
-
-  # ---
-  # tweaks our dataset to get it into the
-  # format we want
-  # - for this dataset, we just need to
-  #  ensure the count is a number
-  # - for your own dataset, you might want
-  #  to tweak a bit more
-  # ---
-  # transformData = (rawData) ->
-  #   rawData.forEach (d) ->
-  #     d.count = parseInt(d.count)
-  #     rawData.sort(() -> 0.5 - Math.random())
-  #   rawData
+  jitter = 0.4
 
   # ---
   # tick callback function will be executed for every
@@ -113,7 +103,6 @@ Bubbles = () ->
       # we have some data
       maxDomainValue = d3.max(allData, (n) -> d3.max(n.values, (d) -> rValue(d)))
       rScale.domain([0, maxDomainValue])
-      console.log(maxDomainValue)
 
       data = getYearData(currentYear)
 
@@ -124,26 +113,29 @@ Bubbles = () ->
       svg.attr("height", height + margin.top + margin.bottom )
       
       # node will be used to group the bubbles
-      node = svgEnter.append("g").attr("id", "bubble-nodes")
+      nodes = svgEnter.append("g").attr("id", "bubble-nodes")
         .attr("transform", "translate(#{margin.left},#{margin.top})")
 
       # clickable background rect to clear the current selection
-      node.append("rect")
+      nodes.append("rect")
         .attr("id", "bubble-background")
         .attr("width", width)
         .attr("height", height)
         .on("click", clear)
 
-      # label is the container div for all the labels that sit on top of 
+      # labels is the container div for all the labels that sit on top of 
       # the bubbles
       # - remember that we are keeping the labels in plain html and 
       #  the bubbles in svg
-      label = d3.select(this).selectAll("#bubble-labels").data([data])
+      labels = d3.select(this).selectAll("#bubble-labels").data([data])
         .enter()
         .append("div")
         .attr("id", "bubble-labels")
 
       update()
+
+      dispatch.on "yearchange.bubble", (year) ->
+        updateYear('' + year)
 
       # see if url includes an id already 
       hashchange()
@@ -165,12 +157,12 @@ Bubbles = () ->
     data.forEach (d,i) ->
       d.forceR = Math.max(minCollisionRadius, rScale(rValue(d)))
 
-    # start up the force layout
-    force.nodes(data).start()
 
     # call our update methods to do the creation and layout work
     updateNodes()
     updateLabels()
+    # start up the force layout
+    force.nodes(data, (d) -> idValue(d)).start()
 
   # ---
   # updateNodes creates a new bubble for each node in our dataset
@@ -180,13 +172,13 @@ Bubbles = () ->
     # data to the (currently) empty 'bubble-node selection'.
     # if you want to use your own data, you just need to modify what
     # idValue returns
-    node = node.selectAll(".bubble-node").data(data, (d) -> idValue(d))
-
+    node = nodes.selectAll(".bubble-node").data(data, (d) -> idValue(d))
 
     # we don't actually remove any nodes from our data in this example 
     # but if we did, this line of code would remove them from the
     # visualization as well
-    node.exit().remove()
+    node.exit()
+      .remove()
 
     # nodes are just links with circles inside.
     # the styling comes from the css
@@ -194,11 +186,8 @@ Bubbles = () ->
       .append("a")
       .attr("class", (d) -> "bubble-node #{classValue(d)}")
       .attr("xlink:href", (d) -> "##{encodeURIComponent(idValue(d))}")
-      .call(force.drag)
-      .call(connectEvents)
       .append("circle")
       .attr("r", 0)
-      # .attr("r", (d) -> rScale(rValue(d)))
 
     node.select("circle").transition()
       .duration(500)
@@ -210,7 +199,7 @@ Bubbles = () ->
   updateLabels = () ->
     # as in updateNodes, we use idValue to define what the unique id for each data 
     # point is
-    label = label.selectAll(".bubble-label").data(data, (d) -> idValue(d))
+    label = labels.selectAll(".bubble-label").data(data, (d) -> idValue(d))
 
     label.exit().remove()
 
@@ -345,7 +334,7 @@ Bubbles = () ->
     id = decodeURIComponent(location.hash.substring(1)).trim()
     updateActive(id)
 
-  # ---
+  # -
   # activates new node
   # ---
   updateActive = (id) ->
@@ -358,9 +347,31 @@ Bubbles = () ->
 
   # ---
   # ---
+  copyLocations = (oldData, newData) ->
+    oldLocs = d3.map()
+    oldData.forEach (d) ->
+      oldLocs.set(idValue(d), {"x": d.x, "y": d.y, "px": d.px, "py": d.py})
+    newData.forEach (d) ->
+      if oldLocs.has(idValue(d))
+        oldLoc = oldLocs.get(idValue(d))
+        d.x = oldLoc.x
+        d.y = oldLoc.y
+        d.px = oldLoc.px
+        d.py = oldLoc.py
+
+  # ---
+  # ---
+  updateYear = (newYear) ->
+    currentYear = newYear
+    oldData = data
+    data = getYearData(currentYear)
+    copyLocations(oldData, data)
+    update()
+
+  # ---
+  # ---
   getYearData = (year) ->
     data = allData.filter((y) -> y.key == year)[0].values
-    console.log(data)
     data
 
   # ---
@@ -427,29 +438,35 @@ Bubbles = () ->
 
 
 Slider = () ->
-  margin = {top: 0, right: 50, bottom: 10, left: 50}
+  margin = {top: 0, right: 20, bottom: 10, left: 20}
   width = 960 - margin.left - margin.right
   height = 75 - margin.top - margin.bottom
   data = []
   handle = null
 
-  xScale = d3.time.scale().range([0, width])
+
+  # xScale = d3.time.scale().range([0, width])
+  #   .clamp(true)
+  xScale = d3.scale.linear().range([0, width])
     .clamp(true)
+  # xScale = d3.scale.ordinal().rangePoints([0, width], 0)
+    # .clamp(true)
 
   xAxis = d3.svg.axis()
     .scale(xScale)
     .orient("bottom")
     .tickSize(0)
     .tickPadding(12)
-
+    .tickFormat((d) -> d)
   format = d3.time.format("%Y")
 
   brushed = () ->
     value = brush.extent()[0]
     if d3.event.sourceEvent
-      value = xScale.invert(d3.mouse(this)[0])
+      value = Math.round(xScale.invert(d3.mouse(this)[0]))
       brush.extent([value,value])
     handle.attr("cx", xScale(value))
+    dispatch.yearchange(value)
 
   brush = d3.svg.brush()
     .x(xScale)
@@ -459,14 +476,14 @@ Slider = () ->
   transformData = (rawData) ->
     data = []
     rawData.forEach (d) ->
-      data.push({"year":d, "date":format.parse(d)})
+      data.push({"year":+d, "date":format.parse(d)})
     data
-      
+
   chart = (selection) ->
     selection.each (inputData) ->
       data = transformData(inputData)
 
-      xScale.domain([data[0].date, data[data.length - 1].date])
+      xScale.domain([data[0].year, data[data.length - 1].year])
 
       svg = d3.select(this).selectAll("svg").data([data])
       svgEnter = svg.enter().append("svg")
@@ -544,7 +561,6 @@ $ ->
   # we are storing the current year in the search component
   # just to make things easy
   key = decodeURIComponent(location.search).replace("?","")
-  console.log(key)
   year = key
 
   # default to the first year
