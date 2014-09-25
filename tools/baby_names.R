@@ -17,3 +17,5 @@ tallied <- tally(names_by_year)
 top_names_by_year <- top_n(names_by_year, 100, n )
 
 summed_names <- summarise(top_names_by_year, count = n(), names = sum(n), female = sum(sex == 'F'), male = sum(sex == 'M'))
+
+write.table(top_names_by_year, file = "~/Desktop/top_baby_names.tsv", sep = "\t", row.names = FALSE, col.names = TRUE)

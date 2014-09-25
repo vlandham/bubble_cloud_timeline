@@ -458,6 +458,7 @@ Slider = () ->
     .tickSize(0)
     .tickPadding(12)
     .tickFormat((d) -> d)
+
   format = d3.time.format("%Y")
 
   brushed = () ->
