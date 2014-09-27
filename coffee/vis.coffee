@@ -554,7 +554,6 @@ Slider = () ->
       dispatch.animation("stop")
 
   handleAnimation = (action) ->
-    console.log(action)
     if action == "start"
       play()
       timer = setInterval(play, 700)
