@@ -481,10 +481,12 @@ Slider = () ->
   brushed = () ->
     value = brush.extent()[0]
     if d3.event.sourceEvent
-      value = Math.round(xScale.invert(d3.mouse(this)[0]))
-      brush.extent([value,value])
-    curYear = value
-    console.log(curYear)
+      if d3.mouse(this)[0] > 0
+        value = Math.round(xScale.invert(d3.mouse(this)[0]))
+        brush.extent([value,value])
+        curYear = value
+    else
+      value = curYear
     handle.attr("cx", xScale(value))
     dispatch.yearchange(value)
 
@@ -555,7 +557,7 @@ Slider = () ->
     console.log(action)
     if action == "start"
       play()
-      timer = setInterval(play, 600)
+      timer = setInterval(play, 700)
     if action == "stop"
       clearInterval(timer)
 
