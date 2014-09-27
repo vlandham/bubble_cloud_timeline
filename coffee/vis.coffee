@@ -1,7 +1,7 @@
 
 root = exports ? this
 
-dispatch = d3.dispatch("yearchange", "yearstart", "animation")
+dispatch = d3.dispatch("yearchange", "animation", "filter")
 
 Bubbles = () ->
   # standard variables accessible to
@@ -18,6 +18,7 @@ Bubbles = () ->
   # largest size for our bubbles
   maxRadius = 60
   currentYear = '1880'
+  currentFilter = null
   currentNode = null
 
   # this scale will be used to size our bubbles
@@ -137,7 +138,10 @@ Bubbles = () ->
 
       # year needs to be a string. We can convert it here
       dispatch.on "yearchange.bubble", (year) ->
-        updateYear('' + year)
+        updateData('' + year, currentFilter)
+
+      dispatch.on "filter.bubble", (filter) ->
+        updateData(currentYear, filter)
 
   # ---
   # update starts up the force directed layout and then
@@ -180,13 +184,14 @@ Bubbles = () ->
     node.enter()
       .append("a")
       .attr("class", (d) -> "bubble-node #{classValue(d)}")
-      .attr("xlink:href", (d) -> "##{encodeURIComponent(idValue(d))}")
+      # .attr("xlink:href", (d) -> "##{encodeURIComponent(idValue(d))}")
       .append("circle")
       .attr("r", 0)
 
     node.select("circle").transition()
       .duration(500)
       .attr("r", (d) -> rScale(rValue(d)))
+
   # ---
   # updateLabels is more involved as we need to deal with getting the sizing
   # to work well with the font size
@@ -203,7 +208,7 @@ Bubbles = () ->
     # is easier to append multiple elements to this selection
     labelEnter = label.enter().append("a")
       .attr("class", "bubble-label")
-      .attr("href", (d) -> "##{encodeURIComponent(idValue(d))}")
+      # .attr("href", (d) -> "##{encodeURIComponent(idValue(d))}")
       .call(force.drag)
       .call(connectEvents)
 
@@ -313,20 +318,19 @@ Bubbles = () ->
   # clears currently selected bubble
   # ---
   clear = () ->
-    location.replace("#")
+    updateActive(null)
 
   # ---
   # changes clicked bubble by modifying url
   # ---
   click = (d) ->
     updateActive(idValue(d))
-    d3.event.preventDefault()
 
   # ---
   # called when url after the # changes
   # ---
-  hashchange = () ->
-    id = decodeURIComponent(location.hash.substring(1)).trim()
+  # hashchange = () ->
+  #   id = decodeURIComponent(location.hash.substring(1)).trim()
 
   # -
   # activates new node
@@ -338,6 +342,10 @@ Bubbles = () ->
       # d3.select("#status").html("<h3>The word <span class=\"active\">#{id}</span> is now active</h3>")
     # else
       # d3.select("#status").html("<h3>No word is active</h3>")
+
+  # ---
+  # ---
+  # updateFilter = (newFilter) ->
 
   # ---
   # ---
@@ -355,10 +363,12 @@ Bubbles = () ->
 
   # ---
   # ---
-  updateYear = (newYear) ->
+  updateData = (newYear, newFilter) ->
     currentYear = newYear
+    currentFilter = newFilter
     oldData = data
     data = getYearData(currentYear)
+    data = getFilterData(data, currentFilter)
     copyLocations(oldData, data)
     update()
 
@@ -366,6 +376,18 @@ Bubbles = () ->
   # ---
   getYearData = (year) ->
     data = allData.filter((y) -> y.key == year)[0].values
+    data
+
+  # ---
+  # ---
+  getFilterData = (data, filter) ->
+    data = data.filter (d) ->
+      if filter == "male"
+        classValue(d) == "M"
+      else if filter == "female"
+        classValue(d) == "F"
+      else
+        true
     data
 
   # ---
@@ -444,14 +466,8 @@ Slider = () ->
   yearExtent = []
   timer = null
   
-
-
-  # xScale = d3.time.scale().range([0, width])
-  #   .clamp(true)
   xScale = d3.scale.linear().range([0, width])
     .clamp(true)
-  # xScale = d3.scale.ordinal().rangePoints([0, width], 0)
-    # .clamp(true)
 
   xAxis = d3.svg.axis()
     .scale(xScale)
@@ -467,6 +483,8 @@ Slider = () ->
     if d3.event.sourceEvent
       value = Math.round(xScale.invert(d3.mouse(this)[0]))
       brush.extent([value,value])
+    curYear = value
+    console.log(curYear)
     handle.attr("cx", xScale(value))
     dispatch.yearchange(value)
 
@@ -516,10 +534,10 @@ Slider = () ->
         .attr("transform", "translate(0," + height / 2 + ")")
         .attr("r", 9)
 
-      dispatch.on "yearstart.slider", (year) ->
-        curYear = +year
-        brush.extent([+year, +year])
-        brush.event(slider)
+      # dispatch.on "yearstart.slider", (year) ->
+      #   curYear = +year
+      #   brush.extent([+year, +year])
+      #   brush.event(slider)
 
       dispatch.on("animation.slider", handleAnimation)
 
@@ -540,19 +558,6 @@ Slider = () ->
       timer = setInterval(play, 600)
     if action == "stop"
       clearInterval(timer)
-
-    
-  chart.start = () ->
-    d3.select("#play").attr("disabled", true)
-    curTime = beginTime
-    play()
-    timer = setInterval(play, 600)
-
-  chart.stop = () ->
-    line.attr("y1", 0).attr("y2", 0)
-    d3.select("#play").attr("disabled", null)
-    clearInterval(timer)
-      
 
   return chart
 
@@ -586,6 +591,15 @@ transformData = (rawData) ->
 # ---
 updateTitle = (newYear) ->
   d3.select("#dynamic-title").html(newYear)
+
+
+# ---
+# Activate selector button
+# ---
+activateLink = (group, link) ->
+  d3.selectAll("##{group} a").classed("active", false)
+  d3.select("##{group} ##{link}").classed("active", true)
+
 
 # ---
 # jQuery document ready.
@@ -636,4 +650,10 @@ $ ->
 
   dispatch.on "yearchange.title", (year) ->
     updateTitle('' + year)
+
+  d3.selectAll("#filter a").on "click", (d) ->
+    newFilter = d3.select(this).attr("id")
+    activateLink("filter", newFilter)
+    dispatch.filter(newFilter)
+  
 

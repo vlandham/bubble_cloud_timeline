@@ -5,19 +5,47 @@ a, a:visited {
 
 #container {
   width: 990px;
-  border-left: 2px #ddd solid;
-  border-right: 2px #ddd solid;
+  /* border-left: 2px #ddd solid; */
+  /* border-right: 2px #ddd solid; */
 }
 
 header {
   padding: 10px;
 }
 
+#controls {
+  width: 100%;
+  /* float: left; */
+  /* margin-bottom: 10px; */
+}
+
+.control {
+  float: left;
+  padding-left: 20px;
+}
+
+.control a {
+  color: black;
+  font-size: 12px;
+  padding: 5px;
+  background: #E2E2E2;
+  cursor: pointer;
+  margin-right: 3px;
+  text-decoration: none;
+}
+
+.control a.active {
+  color: white;
+  background: #555;
+}
+
+
+
+
 #dynamic-title {
   font-family: georgia, "times new roman", times, serif;
   color: #555;
-  font-size: 2.3em;
-  text-align: center;
+  /* font-size: 2.3em; */
 }
 
 #text-select {
@@ -32,13 +60,6 @@ header {
 
 #status {
   padding:0 0 20px 20px;
-}
-
-#controls {
-  padding: 20px;
-  background-color: #eee;
-  margin: 10px;
-  width: 350px;
 }
 
 #bubble-background {
