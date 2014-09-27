@@ -13,8 +13,8 @@
 
   <meta name="viewport" content="width=device-width,initial-scale=1">
 
-  <link rel="stylesheet" href="css/reset.css">
   <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/bootstrap-theme.min.css">
   <link rel="stylesheet" href="css/style.css">
 
   <script src="js/libs/modernizr-2.0.6.min.js"></script>
@@ -30,6 +30,16 @@
     </header>
     <div id="main" role="main">
       <div id="vis"></div>
+      <div id="button-holder">
+        <button id="play" class="btn btn-default">
+          Play&nbsp;
+          <span class="glyphicon glyphicon-play"></span>
+        </button>
+        <button id="pause" class="btn btn-default hidden">
+          Pause&nbsp;
+          <span class="glyphicon glyphicon-pause"></span>
+        </button>
+      </div>
       <div id="slider"></div>
     </div>
     <footer>

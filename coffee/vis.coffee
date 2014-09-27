@@ -1,7 +1,7 @@
 
 root = exports ? this
 
-dispatch = d3.dispatch("yearchange")
+dispatch = d3.dispatch("yearchange", "yearstart", "animation")
 
 Bubbles = () ->
   # standard variables accessible to
@@ -18,6 +18,7 @@ Bubbles = () ->
   # largest size for our bubbles
   maxRadius = 60
   currentYear = '1880'
+  currentNode = null
 
   # this scale will be used to size our bubbles
   rScale = d3.scale.sqrt().range([0,maxRadius])
@@ -134,15 +135,9 @@ Bubbles = () ->
 
       update()
 
+      # year needs to be a string. We can convert it here
       dispatch.on "yearchange.bubble", (year) ->
         updateYear('' + year)
-
-      # see if url includes an id already 
-      hashchange()
-
-      # automatically call hashchange when the url has changed
-      d3.select(window)
-        .on("hashchange", hashchange)
 
   # ---
   # update starts up the force directed layout and then
@@ -216,9 +211,9 @@ Bubbles = () ->
       .attr("class", "bubble-label-name")
       .text((d) -> textValue(d))
 
-    labelEnter.append("div")
-      .attr("class", "bubble-label-value")
-      .text((d) -> rValue(d))
+    # labelEnter.append("div")
+    #   .attr("class", "bubble-label-value")
+    #   .text((d) -> rValue(d))
 
     # label font size is determined based on the size of the bubble
     # this sizing allows for a bit of overhang outside of the bubble
@@ -324,7 +319,7 @@ Bubbles = () ->
   # changes clicked bubble by modifying url
   # ---
   click = (d) ->
-    location.replace("#" + encodeURIComponent(idValue(d)))
+    updateActive(idValue(d))
     d3.event.preventDefault()
 
   # ---
@@ -332,7 +327,6 @@ Bubbles = () ->
   # ---
   hashchange = () ->
     id = decodeURIComponent(location.hash.substring(1)).trim()
-    updateActive(id)
 
   # -
   # activates new node
@@ -439,10 +433,17 @@ Bubbles = () ->
 
 Slider = () ->
   margin = {top: 0, right: 20, bottom: 10, left: 20}
-  width = 960 - margin.left - margin.right
+  width = 850 - margin.left - margin.right
   height = 75 - margin.top - margin.bottom
   data = []
   handle = null
+  slider = null
+
+  addYears = 1
+  curYear = null
+  yearExtent = []
+  timer = null
+  
 
 
   # xScale = d3.time.scale().range([0, width])
@@ -484,7 +485,9 @@ Slider = () ->
     selection.each (inputData) ->
       data = transformData(inputData)
 
-      xScale.domain([data[0].year, data[data.length - 1].year])
+      yearExtent = d3.extent(data, (d) -> d.year)
+      curYear = yearExtent[0]
+      xScale.domain(yearExtent)
 
       svg = d3.select(this).selectAll("svg").data([data])
       svgEnter = svg.enter().append("svg")
@@ -513,6 +516,44 @@ Slider = () ->
         .attr("transform", "translate(0," + height / 2 + ")")
         .attr("r", 9)
 
+      dispatch.on "yearstart.slider", (year) ->
+        curYear = +year
+        brush.extent([+year, +year])
+        brush.event(slider)
+
+      dispatch.on("animation.slider", handleAnimation)
+
+  play = () ->
+    if curYear <= yearExtent[1]
+      brush.extent([+curYear, +curYear])
+      brush.event(slider)
+      curYear = curYear + 1
+    else
+      curYear = yearExtent[0]
+      handleAnimation("stop")
+      dispatch.animation("stop")
+
+  handleAnimation = (action) ->
+    console.log(action)
+    if action == "start"
+      play()
+      timer = setInterval(play, 600)
+    if action == "stop"
+      clearInterval(timer)
+
+    
+  chart.start = () ->
+    d3.select("#play").attr("disabled", true)
+    curTime = beginTime
+    play()
+    timer = setInterval(play, 600)
+
+  chart.stop = () ->
+    line.attr("y1", 0).attr("y2", 0)
+    d3.select("#play").attr("disabled", null)
+    clearInterval(timer)
+      
+
   return chart
 
 # ---
@@ -525,7 +566,8 @@ root.plotData = (selector, data, plot) ->
     .datum(data)
     .call(plot)
 
-
+# ---
+# ---
 transformData = (rawData) ->
   nest = d3.nest()
     .key((d) -> d.year)
@@ -541,12 +583,18 @@ transformData = (rawData) ->
   nest
 
 # ---
+# ---
+updateTitle = (newYear) ->
+  d3.select("#dynamic-title").html(newYear)
+
+# ---
 # jQuery document ready.
 # ---
 $ ->
   # create a new Bubbles chart
   plot = Bubbles()
   slider = Slider()
+
 
   # ---
   # function that is called when
@@ -558,15 +606,9 @@ $ ->
 
     plotData("#vis", data, plot)
     plotData("#slider", years, slider)
+    dispatch.yearchange(years[0])
+    # dispatch.yearstart(year)
 
-  # we are storing the current year in the search component
-  # just to make things easy
-  key = decodeURIComponent(location.search).replace("?","")
-  year = key
-
-  # default to the first year
-  if !year
-    year = '1880'
 
   # bind change in drop down to change the
   # search url and reset the hash url
@@ -576,9 +618,22 @@ $ ->
   #     location.replace("#")
   #     location.search = encodeURIComponent(key)
 
-  # set the book title from the text name
-  d3.select("#dynamic-title").html(year)
 
   # load our data
   d3.tsv("data/top_baby_names.tsv", display)
+
+  d3.select("#play").on "click", () ->
+    dispatch.animation("start")
+
+  d3.select("#pause").on "click", () ->
+    dispatch.animation("stop")
+
+  dispatch.on "animation.buttons", (action) ->
+    shown = if (action == "start") then "#pause" else "#play"
+    hidden = if (action == "start") then "#play" else "#pause"
+    d3.select(hidden).classed("hidden", true)
+    d3.select(shown).classed("hidden", false)
+
+  dispatch.on "yearchange.title", (year) ->
+    updateTitle('' + year)
 

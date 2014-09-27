@@ -1,14 +1,10 @@
 
-body {
-}
-
 a, a:visited {
   color:#333;
 }
 
 #container {
-  padding-top:20px;
-  width: 980px;
+  width: 990px;
   border-left: 2px #ddd solid;
   border-right: 2px #ddd solid;
 }
@@ -95,6 +91,15 @@ a.bubble-label {
 .bubble-label .bubble-label-value {
   font: 11px sans-serif;
   white-space: nowrap;
+}
+
+#button-holder {
+  float: left;
+  margin-top: 20px;
+}
+
+#slider {
+  float:right;
 }
 
 .axis {
